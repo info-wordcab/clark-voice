@@ -1,10 +1,10 @@
 [project]
 name = "receptionist"
 version = "0.1.0"
-description = "AI Receptionist using Pipecat with AssemblyAI, SambaNova, and Inworld"
+description = "AI Receptionist using Pipecat with AssemblyAI, SambaNova, and Cartesia"
 requires-python = ">=3.11"
 dependencies = [
-    "pipecat-ai[assemblyai,google,cartesia,runner,silero]",
+    "pipecat-ai[assemblyai,google,openai,sambanova,cartesia,twilio,runner,silero]",
     "python-dotenv",
     "httpx",
     "aiohttp",

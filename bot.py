@@ -8,10 +8,7 @@ This bot uses configurable providers:
 It includes an operator/sink system for reacting to call events
 and triggering actions like webhooks or injected speech.
 
-Supports multiple transports:
-- daily: For browser WebRTC via Daily rooms (and phone via Daily SIP)
-- twilio: For direct Twilio WebSocket Media Streams
-- webrtc: For direct WebRTC without Daily
+Transport: Twilio WebSocket Media Streams
 """
 
 import asyncio
@@ -27,7 +24,6 @@ import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
 
-from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import LLMRunFrame
@@ -37,11 +33,9 @@ from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
-from pipecat.runner.types import DailyRunnerArguments, RunnerArguments, WebSocketRunnerArguments
-from pipecat.runner.utils import create_transport, parse_telephony_websocket
+from pipecat.runner.types import RunnerArguments, WebSocketRunnerArguments
+from pipecat.runner.utils import parse_telephony_websocket
 from pipecat.transports.base_transport import BaseTransport, TransportParams
-from pipecat.transports.daily.transport import DailyParams, DailyTransport
-from pipecat.transports.daily.utils import DailyRESTHelper
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 
 from config import (
@@ -107,33 +101,24 @@ def get_turn_analyzer():
 
     Returns:
         LocalSmartTurnAnalyzerV3 if TURN_DETECTION_MODEL="pipecat", None otherwise.
-        - "pipecat": ML-based smart turn detection
+        - "pipecat": ML-based smart turn detection (requires pipecat-ai[local-smart-turn-v3])
         - "assemblyai": None (AssemblyAI handles turn detection internally)
         - "none": None (VAD-only, silence-based turn detection)
     """
     if TURN_DETECTION_MODEL == "pipecat":
+        # Import only when needed - requires pipecat-ai[local-smart-turn-v3]
+        from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
+
         logger.debug("Creating LocalSmartTurnAnalyzerV3 for turn detection")
         return LocalSmartTurnAnalyzerV3()
     # For "assemblyai" or "none", return None (VAD-only or AssemblyAI handles it)
     return None
 
 
-# Transport parameters for different backends
+# Transport parameters for Twilio
 # turn_analyzer is set based on TURN_DETECTION_MODEL config
 transport_params = {
-    "daily": lambda: DailyParams(
-        audio_in_enabled=True,
-        audio_out_enabled=True,
-        vad_analyzer=SileroVADAnalyzer(params=get_vad_params()),
-        turn_analyzer=get_turn_analyzer(),
-    ),
     "twilio": lambda: FastAPIWebsocketParams(
-        audio_in_enabled=True,
-        audio_out_enabled=True,
-        vad_analyzer=SileroVADAnalyzer(params=get_vad_params()),
-        turn_analyzer=get_turn_analyzer(),
-    ),
-    "webrtc": lambda: TransportParams(
         audio_in_enabled=True,
         audio_out_enabled=True,
         vad_analyzer=SileroVADAnalyzer(params=get_vad_params()),
@@ -552,52 +537,43 @@ async def run_bot(
 
 
 async def create_transport_with_call_data(runner_args: RunnerArguments):
-    """Create transport and extract call_data for telephony transports.
+    """Create Twilio transport and extract call_data.
 
-    This wraps Pipecat's create_transport to also return the parsed call_data
-    which contains customParameters from TwiML <Parameter> tags.
+    Parses the Twilio WebSocket to extract customParameters from TwiML <Parameter> tags.
 
     Returns:
-        tuple: (transport, call_data) where call_data is None for non-telephony transports
+        tuple: (transport, call_data)
     """
-    from pipecat.runner.types import DailyRunnerArguments, SmallWebRTCRunnerArguments
+    if not isinstance(runner_args, WebSocketRunnerArguments):
+        raise ValueError("Only WebSocket (Twilio) transport is supported")
 
-    call_data = None
+    # Parse the WebSocket to capture call_data before creating the transport
+    transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
 
-    if isinstance(runner_args, WebSocketRunnerArguments):
-        # For telephony (Twilio, etc.), parse the WebSocket ourselves first
-        # to capture the call_data before creating the transport
-        transport_type, call_data = await parse_telephony_websocket(runner_args.websocket)
+    logger.info(
+        f"Parsed telephony WebSocket: type={transport_type}, call_id={call_data.get('call_id')}"
+    )
+    logger.debug(f"Call data body (customParameters): {call_data.get('body', {})}")
 
-        logger.info(
-            f"Parsed telephony WebSocket: type={transport_type}, call_id={call_data.get('call_id')}"
-        )
-        logger.debug(f"Call data body (customParameters): {call_data.get('body', {})}")
+    if transport_type != "twilio":
+        raise ValueError(f"Unsupported telephony provider: {transport_type}")
 
-        # Now create the transport using the parsed data
-        # We need to replicate what _create_telephony_transport does
-        params = transport_params.get(transport_type, transport_params.get("twilio"))()
-        params.add_wav_header = False
+    # Create transport params
+    params = transport_params["twilio"]()
+    params.add_wav_header = False
 
-        if transport_type == "twilio":
-            from pipecat.serializers.twilio import TwilioFrameSerializer
+    from pipecat.serializers.twilio import TwilioFrameSerializer
 
-            params.serializer = TwilioFrameSerializer(
-                stream_sid=call_data["stream_id"],
-                call_sid=call_data["call_id"],
-                account_sid=os.getenv("TWILIO_ACCOUNT_SID", ""),
-                auth_token=os.getenv("TWILIO_AUTH_TOKEN", ""),
-            )
-        else:
-            raise ValueError(f"Unsupported telephony provider: {transport_type}")
+    params.serializer = TwilioFrameSerializer(
+        stream_sid=call_data["stream_id"],
+        call_sid=call_data["call_id"],
+        account_sid=os.getenv("TWILIO_ACCOUNT_SID", ""),
+        auth_token=os.getenv("TWILIO_AUTH_TOKEN", ""),
+    )
 
-        from pipecat.transports.websocket.fastapi import FastAPIWebsocketTransport
+    from pipecat.transports.websocket.fastapi import FastAPIWebsocketTransport
 
-        transport = FastAPIWebsocketTransport(websocket=runner_args.websocket, params=params)
-
-    else:
-        # For non-telephony transports, use the standard create_transport
-        transport = await create_transport(runner_args, transport_params)
+    transport = FastAPIWebsocketTransport(websocket=runner_args.websocket, params=params)
 
     return transport, call_data
 
@@ -613,132 +589,8 @@ async def bot(runner_args: RunnerArguments):
     await run_bot(transport, runner_args, call_data)
 
 
-async def run_daily_bot(room_url: str, call_metadata: dict):
-    """Spawn a bot to join a specific Daily room.
-
-    Called by the /start endpoint when Django receives a Twilio call
-    and creates a Daily room with SIP dial-in.
-
-    Args:
-        room_url: The Daily room URL to join
-        call_metadata: Metadata about the call (call_id, business_id, etc.)
-    """
-    logger.info(f"Spawning Daily bot for room: {room_url}")
-
-    daily_api_key = os.getenv("DAILY_API_KEY")
-    if not daily_api_key:
-        logger.error("DAILY_API_KEY not configured")
-        return
-
-    async with aiohttp.ClientSession() as session:
-        # Get a token for the room
-        helper = DailyRESTHelper(
-            daily_api_key=daily_api_key,
-            daily_api_url="https://api.daily.co/v1",
-            aiohttp_session=session,
-        )
-
-        try:
-            token = await helper.get_token(
-                room_url=room_url,
-                expiry_time=60 * 60,  # 1 hour
-                owner=True,
-            )
-        except Exception as e:
-            logger.exception(f"Failed to get Daily token: {e}")
-            return
-
-        # Create DailyTransport directly
-        transport = DailyTransport(
-            room_url=room_url,
-            token=token,
-            bot_name="Clark AI",
-            params=DailyParams(
-                audio_in_enabled=True,
-                audio_out_enabled=True,
-                vad_analyzer=SileroVADAnalyzer(params=get_vad_params()),
-            ),
-        )
-
-        # Create runner args with the call metadata
-        runner_args = DailyRunnerArguments(
-            room_url=room_url,
-            token=token,
-        )
-        # Attach call metadata for the observer
-        runner_args.body = call_metadata
-
-        # Run the bot
-        await run_bot(transport, runner_args, call_data=call_metadata)
-
-
-# Store for active bot tasks
-_active_bots: dict = {}
-
-
-def get_fastapi_app():
-    """Get FastAPI app with /start endpoint for spawning Daily bots.
-
-    This is used when running with -t daily to provide an HTTP endpoint
-    that Django can call to spawn a bot into a specific Daily room.
-    """
-    from fastapi import FastAPI
-    from pydantic import BaseModel
-
-    app = FastAPI(title="Clark Receptionist Bot")
-
-    class StartRequest(BaseModel):
-        room_url: str
-        call_id: str
-        business_id: str
-        caller_phone: str = ""
-        called_phone: str = ""
-
-    @app.post("/start")
-    async def start_bot(request: StartRequest):
-        """Start a bot in a Daily room.
-
-        Called by Django when a Twilio call comes in and a Daily SIP room is created.
-        """
-        call_metadata = {
-            "call_sid": request.call_id,
-            "business_id": request.business_id,
-            "from_number": request.caller_phone,
-            "to_number": request.called_phone,
-        }
-
-        # Spawn bot as background task
-        task = asyncio.create_task(run_daily_bot(request.room_url, call_metadata))
-        _active_bots[request.call_id] = task
-
-        logger.info(f"Started bot for call {request.call_id} in room {request.room_url}")
-        return {"status": "started", "call_id": request.call_id}
-
-    @app.get("/health")
-    async def health():
-        return {"status": "ok", "active_bots": len(_active_bots)}
-
-    return app
-
-
 if __name__ == "__main__":
-    import argparse
+    # Use standard pipecat runner for Twilio WebSocket
+    from pipecat.runner.run import main
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--transport", choices=["daily", "twilio", "webrtc"], default="daily")
-    parser.add_argument("-p", "--port", type=int, default=7860)
-    args, unknown = parser.parse_known_args()
-
-    if args.transport == "daily":
-        # Run FastAPI server with /start endpoint for Daily bots
-        import uvicorn
-
-        app = get_fastapi_app()
-        logger.info(f"Starting Daily bot server on port {args.port}")
-        logger.info("POST /start to spawn a bot into a Daily room")
-        uvicorn.run(app, host="0.0.0.0", port=args.port)
-    else:
-        # Use standard pipecat runner for twilio/webrtc
-        from pipecat.runner.run import main
-
-        main()
+    main()

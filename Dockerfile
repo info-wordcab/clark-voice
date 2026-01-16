@@ -17,4 +17,4 @@ COPY . .
 
 EXPOSE 7860
 
-CMD ["python", "bot.py", "-t", "twilio"]
+CMD ["python", "bot.py", "-t", "twilio", "--host", "0.0.0.0"]
