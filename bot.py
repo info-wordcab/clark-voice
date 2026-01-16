@@ -32,6 +32,7 @@ from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
+from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
@@ -73,7 +74,7 @@ from operators.call_lifecycle import CallLifecycleOperator
 from operators.end_call import EndCallOperator
 from pipeline.observer import ReceptionistObserver
 from sinks.stdout import StdoutSink
-from sinks.webhook import WebhookSink
+from sinks.webhook import WebhookSink, upload_recording_to_django
 
 load_dotenv(override=True)
 
@@ -85,19 +86,19 @@ _current_call_data: Optional[dict] = None
 def get_vad_params() -> VADParams:
     """Get VAD parameters tuned for low-latency phone calls.
 
-    These parameters prioritize responsiveness while still handling
-    phone audio artifacts (noise, echo, compression):
+    These parameters balance responsiveness with avoiding false triggers
+    that cut off AI responses mid-sentence:
 
-    - stop_secs: 0.3s - respond quickly after user stops (was 0.4s)
-    - start_secs: 0.15s - detect speech start faster
-    - min_volume: 0.4 - catch softer speech on phone
-    - confidence: 0.7 - slightly higher to reduce false triggers
+    - stop_secs: 0.3s - respond quickly after user stops (configurable)
+    - start_secs: 0.2s - slightly slower to let AI finish speaking
+    - min_volume: 0.5 - filter background noise on phone lines
+    - confidence: 0.75 - higher confidence to reduce false positives
     """
     return VADParams(
         stop_secs=VAD_STOP_SECS,  # Configurable silence threshold
-        start_secs=0.15,  # Faster speech detection
-        min_volume=0.4,  # Lower volume threshold for phone audio
-        confidence=0.7,  # Balance sensitivity with false positive reduction
+        start_secs=0.2,  # Slower trigger to avoid cutting off AI
+        min_volume=0.5,  # Higher threshold to filter phone noise
+        confidence=0.75,  # Higher confidence to reduce false triggers
     )
 
 
@@ -382,7 +383,41 @@ async def run_bot(
         observer.set_tts(tts)
         observer.set_llm_context(messages)  # Enable dynamic system prompts
 
-        # Build pipeline
+        # Create audio recorder for call recording
+        # Stereo: user audio on left channel, bot audio on right channel
+        # buffer_size=0 means collect entire call and trigger on EndFrame
+        # Note: Don't set sample_rate - let it match the pipeline's internal rate
+        audio_recorder = AudioBufferProcessor(
+            num_channels=2,  # Stereo (user + bot)
+            buffer_size=0,  # Collect entire call
+        )
+
+        # Variable to capture call_sid for the recording handler
+        recording_call_sid = None
+
+        @audio_recorder.event_handler("on_audio_data")
+        async def on_recording_complete(
+            buffer, audio_data: bytes, sample_rate: int, num_channels: int
+        ):
+            """Upload recording to Django when call ends.
+
+            Args:
+                buffer: The AudioBufferProcessor instance
+                audio_data: Raw PCM audio bytes
+                sample_rate: Sample rate in Hz
+                num_channels: Number of audio channels
+            """
+            if recording_call_sid and audio_data:
+                # Fire and forget - don't block pipeline shutdown
+                asyncio.create_task(
+                    upload_recording_to_django(
+                        recording_call_sid, audio_data, sample_rate, num_channels
+                    )
+                )
+
+        # Build pipeline with audio recorder
+        # IMPORTANT: AudioBufferProcessor must be AFTER transport.output() to capture
+        # both user input and bot output audio. Placing it earlier only captures input.
         pipeline = Pipeline(
             [
                 transport.input(),
@@ -391,11 +426,14 @@ async def run_bot(
                 llm,
                 tts,
                 transport.output(),
+                audio_recorder,  # After output to capture both sides of conversation
                 context_aggregator.assistant(),
             ]
         )
 
         # Create task with observer
+        # Note: Don't set audio sample rates - let pipecat handle resampling
+        # (Twilio uses 8kHz, but AssemblyAI needs 16kHz internally)
         task = PipelineTask(
             pipeline,
             params=PipelineParams(
@@ -429,6 +467,8 @@ async def run_bot(
                     # Demo call parameters (from landing page)
                     "is_demo": custom_params.get("is_demo"),
                     "industry": custom_params.get("industry"),
+                    # Recording control (for test calls)
+                    "save_recording": custom_params.get("save_recording", "true").lower() == "true",
                 }
                 if call_metadata.get("is_demo"):
                     logger.info(
@@ -452,6 +492,27 @@ async def run_bot(
 
             # Start the observer with call metadata
             await observer.start(call_metadata=call_metadata)
+
+            # Start recording (only for real calls, not demo calls or unsaved test calls)
+            nonlocal recording_call_sid
+            is_demo = call_metadata.get("is_demo")
+            save_recording = call_metadata.get("save_recording", True)
+            call_sid = call_metadata.get("call_sid")
+
+            if call_sid and not is_demo and save_recording:
+                recording_call_sid = call_sid
+                await audio_recorder.start_recording()
+                logger.info(f"Started recording for call {recording_call_sid}")
+            else:
+                recording_call_sid = None
+                reason = (
+                    "demo call"
+                    if is_demo
+                    else "save_recording=false"
+                    if not save_recording
+                    else "no call_sid"
+                )
+                logger.info(f"Skipping recording: {reason}")
 
             # Wait for business config to load (voice + system prompt)
             # This ensures the correct voice is used for the greeting

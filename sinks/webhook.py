@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import os
 from typing import Optional, Set
 
 import httpx
@@ -10,6 +12,83 @@ from loguru import logger
 
 from pipeline.events import CallContext, OperatorOutput
 from sinks.base import Sink
+
+# Global reference to webhook URL for recording uploads
+WEBHOOK_BASE_URL = os.getenv("DJANGO_INTERNAL_URL", "http://localhost:8000")
+
+
+async def upload_recording_to_django(
+    call_sid: str,
+    audio_data: bytes,
+    sample_rate: int,
+    num_channels: int,
+) -> None:
+    """Upload call recording to Django for storage.
+
+    This is called by the AudioBufferProcessor's on_audio_data handler
+    when the call ends. The audio is uploaded to Django which stores it
+    in Tigris (production) or local filesystem (development).
+
+    Args:
+        call_sid: The call ID (Twilio CallSid)
+        audio_data: Raw WAV audio bytes
+        sample_rate: Sample rate in Hz
+        num_channels: Number of audio channels
+    """
+    if not call_sid:
+        logger.warning("Cannot upload recording: no call_sid provided")
+        return
+
+    if not audio_data or len(audio_data) == 0:
+        logger.warning(f"Cannot upload recording for {call_sid}: no audio data")
+        return
+
+    # Convert audio to WAV format
+    from utils.audio import create_wav_bytes
+
+    wav_data = create_wav_bytes(audio_data, sample_rate, num_channels)
+
+    # Base64 encode for JSON transport
+    audio_b64 = base64.b64encode(wav_data).decode("utf-8")
+
+    # Calculate duration for logging
+    from utils.audio import get_audio_duration
+
+    duration = get_audio_duration(audio_data, sample_rate, num_channels)
+
+    logger.info(
+        f"Uploading recording for call {call_sid}: "
+        f"{len(wav_data) / 1024:.1f}KB, {duration:.1f}s, "
+        f"{sample_rate}Hz, {num_channels}ch"
+    )
+
+    url = f"{WEBHOOK_BASE_URL}/api/telephony/pipecat/recording"
+
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                url,
+                json={
+                    "call_id": call_sid,
+                    "audio_data": audio_b64,
+                    "sample_rate": sample_rate,
+                    "num_channels": num_channels,
+                    "duration": duration,
+                    "format": "wav",
+                },
+            )
+
+            if response.status_code == 200:
+                logger.info(f"Recording uploaded for call {call_sid}")
+            else:
+                logger.error(
+                    f"Recording upload failed for {call_sid}: "
+                    f"status {response.status_code}: {response.text}"
+                )
+    except httpx.TimeoutException:
+        logger.error(f"Recording upload timeout for {call_sid}")
+    except Exception as e:
+        logger.error(f"Recording upload error for {call_sid}: {e}")
 
 
 class WebhookSink(Sink):
