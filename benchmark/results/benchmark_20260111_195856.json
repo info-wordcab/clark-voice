@@ -1,0 +1,70 @@
+{
+  "timestamp": "2026-01-12T00:56:49.348695Z",
+  "api_keys_available": {
+    "assemblyai": true,
+    "deepgram": true,
+    "sambanova": true,
+    "openai": true,
+    "cartesia": true,
+    "rime": true,
+    "hume": true,
+    "inworld": true
+  },
+  "tts": {
+    "cartesia": {
+      "provider": "cartesia",
+      "model": "",
+      "ttfb_avg": 0.48984010060012223,
+      "ttfb_min": 0.40425655099897995,
+      "ttfb_max": 0.6826570709999942,
+      "ttfb_std": 0.11268454677783779,
+      "total_time_avg": 0.48984010060012223,
+      "success_rate": 1.0,
+      "error_count": 0
+    },
+    "rime": {
+      "provider": "rime",
+      "model": "",
+      "ttfb_avg": 1.0383856070002366,
+      "ttfb_min": 0.749144752000575,
+      "ttfb_max": 1.8350555180004449,
+      "ttfb_std": 0.4497012932161721,
+      "total_time_avg": 1.0383856070002366,
+      "success_rate": 1.0,
+      "error_count": 0
+    },
+    "deepgram": {
+      "provider": "deepgram",
+      "model": "",
+      "ttfb_avg": 0.46704263659994466,
+      "ttfb_min": 0.3366091969983245,
+      "ttfb_max": 0.5249298759990779,
+      "ttfb_std": 0.0749799758472232,
+      "total_time_avg": 0.46704263659994466,
+      "success_rate": 1.0,
+      "error_count": 0
+    },
+    "hume": {
+      "provider": "hume",
+      "model": "",
+      "ttfb_avg": 0.8312079824012472,
+      "ttfb_min": 0.6691901970007166,
+      "ttfb_max": 0.9873175240027194,
+      "ttfb_std": 0.12172364615581843,
+      "total_time_avg": 0.8312079824012472,
+      "success_rate": 1.0,
+      "error_count": 0
+    },
+    "inworld": {
+      "provider": "inworld",
+      "model": "",
+      "ttfb_avg": 0.4476554367996869,
+      "ttfb_min": 0.35165936200064607,
+      "ttfb_max": 0.6018867759994464,
+      "ttfb_std": 0.12068684530531117,
+      "total_time_avg": 0.4476554367996869,
+      "success_rate": 1.0,
+      "error_count": 0
+    }
+  }
+}

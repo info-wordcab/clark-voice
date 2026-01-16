@@ -1,0 +1,70 @@
+{
+  "timestamp": "2026-01-12T00:42:42.949398Z",
+  "api_keys_available": {
+    "assemblyai": true,
+    "deepgram": true,
+    "sambanova": true,
+    "openai": true,
+    "cartesia": true,
+    "rime": true,
+    "hume": true,
+    "inworld": true
+  },
+  "tts": {
+    "cartesia": {
+      "provider": "cartesia",
+      "model": "",
+      "ttfb_avg": 0.46327755699894624,
+      "ttfb_min": 0.38339048699708655,
+      "ttfb_max": 0.6275389680013177,
+      "ttfb_std": 0.09971584709962478,
+      "total_time_avg": 0.46327755699894624,
+      "success_rate": 1.0,
+      "error_count": 0
+    },
+    "rime": {
+      "provider": "rime",
+      "model": "",
+      "ttfb_avg": 0.0,
+      "ttfb_min": 0.0,
+      "ttfb_max": 0.0,
+      "ttfb_std": 0.0,
+      "total_time_avg": 0.0,
+      "success_rate": 0.0,
+      "error_count": 5
+    },
+    "deepgram": {
+      "provider": "deepgram",
+      "model": "",
+      "ttfb_avg": 0.48388492119993315,
+      "ttfb_min": 0.4504407740023453,
+      "ttfb_max": 0.5404023579976638,
+      "ttfb_std": 0.03398341447826019,
+      "total_time_avg": 0.48388492119993315,
+      "success_rate": 1.0,
+      "error_count": 0
+    },
+    "hume": {
+      "provider": "hume",
+      "model": "",
+      "ttfb_avg": 0.0,
+      "ttfb_min": 0.0,
+      "ttfb_max": 0.0,
+      "ttfb_std": 0.0,
+      "total_time_avg": 0.0,
+      "success_rate": 0.0,
+      "error_count": 5
+    },
+    "inworld": {
+      "provider": "inworld",
+      "model": "",
+      "ttfb_avg": 0.0,
+      "ttfb_min": 0.0,
+      "ttfb_max": 0.0,
+      "ttfb_std": 0.0,
+      "total_time_avg": 0.0,
+      "success_rate": 0.0,
+      "error_count": 5
+    }
+  }
+}

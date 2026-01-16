@@ -1,0 +1,33 @@
+[project]
+name = "receptionist"
+version = "0.1.0"
+description = "AI Receptionist using Pipecat with AssemblyAI, SambaNova, and Inworld"
+requires-python = ">=3.11"
+dependencies = [
+    "pipecat-ai[assemblyai,google,cartesia,runner,silero]",
+    "python-dotenv",
+    "httpx",
+    "aiohttp",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "pytest",
+    "pytest-asyncio",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["pipeline*", "operators*", "sinks*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]

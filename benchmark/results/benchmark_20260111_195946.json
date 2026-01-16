@@ -1,0 +1,37 @@
+{
+  "timestamp": "2026-01-12T00:59:01.683082Z",
+  "api_keys_available": {
+    "assemblyai": true,
+    "deepgram": true,
+    "sambanova": true,
+    "openai": true,
+    "cartesia": true,
+    "rime": true,
+    "hume": true,
+    "inworld": true
+  },
+  "stt": {
+    "assemblyai": {
+      "provider": "assemblyai",
+      "model": "",
+      "ttfb_avg": 1.3881394281997927,
+      "ttfb_min": 1.3651952589971188,
+      "ttfb_max": 1.4051417000009678,
+      "ttfb_std": 0.018568908860457388,
+      "total_time_avg": 1.3881394281997927,
+      "success_rate": 1.0,
+      "error_count": 0
+    },
+    "deepgram": {
+      "provider": "deepgram",
+      "model": "",
+      "ttfb_avg": 1.0513182097995013,
+      "ttfb_min": 0.9390444060009031,
+      "ttfb_max": 1.2224239940005646,
+      "ttfb_std": 0.11410593814932929,
+      "total_time_avg": 1.0513182097995013,
+      "success_rate": 1.0,
+      "error_count": 0
+    }
+  }
+}

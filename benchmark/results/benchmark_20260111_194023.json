@@ -1,0 +1,59 @@
+{
+  "timestamp": "2026-01-12T00:39:23.403037Z",
+  "api_keys_available": {
+    "assemblyai": true,
+    "deepgram": true,
+    "sambanova": true,
+    "openai": true,
+    "cartesia": true,
+    "rime": true,
+    "hume": true,
+    "inworld": true
+  },
+  "llm": {
+    "sambanova": {
+      "provider": "sambanova",
+      "model": "Llama-4-Maverick-17B-128E-Instruct",
+      "ttfb_avg": 0.8600308921995747,
+      "ttfb_min": 0.7560431349993451,
+      "ttfb_max": 1.062363902998186,
+      "ttfb_std": 0.1190219952610143,
+      "total_time_avg": 0.8600446860000375,
+      "success_rate": 1.0,
+      "error_count": 0
+    },
+    "gpt-5-nano": {
+      "provider": "gpt-5-nano",
+      "model": "gpt-5-nano",
+      "ttfb_avg": 0.0,
+      "ttfb_min": 0.0,
+      "ttfb_max": 0.0,
+      "ttfb_std": 0.0,
+      "total_time_avg": 0.0,
+      "success_rate": 0.0,
+      "error_count": 5
+    },
+    "gpt-5-mini": {
+      "provider": "gpt-5-mini",
+      "model": "gpt-5-mini",
+      "ttfb_avg": 0.0,
+      "ttfb_min": 0.0,
+      "ttfb_max": 0.0,
+      "ttfb_std": 0.0,
+      "total_time_avg": 0.0,
+      "success_rate": 0.0,
+      "error_count": 5
+    },
+    "gpt-4o": {
+      "provider": "gpt-4o",
+      "model": "gpt-4o",
+      "ttfb_avg": 0.5555686517989671,
+      "ttfb_min": 0.4015336529992055,
+      "ttfb_max": 1.0870262409989664,
+      "ttfb_std": 0.29769675765550174,
+      "total_time_avg": 0.555687594399933,
+      "success_rate": 1.0,
+      "error_count": 0
+    }
+  }
+}
