@@ -43,6 +43,9 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
 # Django API URL (internal via Fly.io 6PN)
 DJANGO_INTERNAL_URL = os.getenv("DJANGO_INTERNAL_URL", "http://localhost:8000")
 
+# Auth token for WebSocket authentication (shared secret with Django)
+PIPECAT_AUTH_TOKEN = os.getenv("PIPECAT_AUTH_TOKEN", "")
+
 # Database URL for direct Postgres writes (shared with Django)
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 

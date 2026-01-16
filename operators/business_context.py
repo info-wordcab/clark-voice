@@ -15,6 +15,7 @@ from loguru import logger
 
 from operators.base import Operator
 from pipeline.events import CallContext, CallEvent, CallLifecycleEvent, OperatorOutput
+from config import PIPECAT_AUTH_TOKEN
 
 
 @dataclass
@@ -335,6 +336,22 @@ CRITICAL: Do NOT re-ask for information the caller has already provided.
             return
 
         if event.kind == "connected":
+            # Validate auth token if configured
+            if PIPECAT_AUTH_TOKEN:
+                received_token = event.payload.get("auth_token", "")
+                if received_token != PIPECAT_AUTH_TOKEN:
+                    logger.warning(
+                        f"Invalid auth token received, rejecting connection. "
+                        f"Call SID: {event.payload.get('call_sid', 'unknown')}"
+                    )
+                    await emit(
+                        OperatorOutput(
+                            kind="end_call",
+                            payload={"reason": "unauthorized"},
+                        )
+                    )
+                    return
+
             # Handle demo calls (from landing page demo)
             # Demo calls load full config from demo_personas.json
             if event.payload.get("is_demo") == "true":
