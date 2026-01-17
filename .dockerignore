@@ -1,0 +1,21 @@
+# Environment files (secrets come from Fly.io)
+.env
+.env.*
+!.env.example
+!.env.prod
+
+# Development files
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db

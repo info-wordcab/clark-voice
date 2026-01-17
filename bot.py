@@ -449,6 +449,7 @@ async def run_bot(
                     "from_number": custom_params.get("caller_phone"),
                     "to_number": custom_params.get("called_phone"),
                     "business_id": custom_params.get("business_id"),
+                    "auth_token": custom_params.get("auth_token"),  # For WebSocket auth
                     # Demo call parameters (from landing page)
                     "is_demo": custom_params.get("is_demo"),
                     "industry": custom_params.get("industry"),
